@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ текстовых документов</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .plot-container {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .plot-img {
+            width: 100%;
+            height: auto;
+        }
+        .cluster-card {
+            margin-bottom: 20px;
+        }
+        .document-card {
+            margin-bottom: 10px;
+        }
+        .document-input {
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .add-doc-btn {
+            margin-bottom: 20px;
+        }
+        .remove-doc-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            z-index: 1;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .form-actions .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        .file-info {
+            margin-left: 10px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">Анализ текстовых документов</h1>
+        
+        <form method="POST" action="/" enctype="multipart/form-data">
+            <div id="documents-container">
+                <div class="document-input">
+                    <button type="button" class="btn btn-danger remove-doc-btn" onclick="removeDocument(this)">×</button>
+                    <input type="file" class="form-control" name="documents[]" accept=".txt,.doc,.docx">
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" id="add-document" class="btn btn-secondary add-doc-btn">+ Добавить файл</button>
+                <div class="btn-group">
+                    <button type="button" id="reset-form" class="btn btn-outline-danger">Сбросить форму</button>
+                    <button type="submit" class="btn btn-primary">Проанализировать</button>
+                </div>
+            </div>
+        </form>
+        
+        {% if error %}
+        <div class="alert alert-danger mt-3">{{ error }}</div>
+        {% endif %}
+        
+        {% if show_results %}
+        <div class="row mb-4 mt-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3>Метод локтя для определения оптимального числа кластеров</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="plot-container">
+                            <img src="data:image/png;base64,{{ elbow_plot }}" class="plot-img" alt="Метод локтя">
+                        </div>
+                        <p class="mt-2"><strong>Оптимальное количество кластеров:</strong> {{ optimal_clusters }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h3>Визуализация кластеров</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="plot-container">
+                            <img src="data:image/png;base64,{{ cluster_plot }}" class="plot-img" alt="Визуализация кластеров">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h3>Распределение документов по кластерам</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="plot-container">
+                            <img src="data:image/png;base64,{{ distribution_plot }}" class="plot-img" alt="Распределение по кластерам">
+                        </div>
+                        <div class="mt-3">
+                            <h4>Количество документов в каждом кластере:</h4>
+                            <ul class="list-group">
+                                {% for cluster, count in cluster_distribution.items() %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ cluster }}
+                                    <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h3>Ключевые слова для каждого кластера</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for cluster_num, words in cluster_words.items() %}
+                            <div class="col-md-6">
+                                <div class="card cluster-card">
+                                    <div class="card-header">
+                                        <h4>Кластер {{ cluster_num }}</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Слово</th>
+                                                    <th>Частота</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for word, count in words.items() %}
+                                                <tr>
+                                                    <td>{{ word }}</td>
+                                                    <td>{{ count }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h3>Документы и их кластеры</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="accordion" id="documentsAccordion">
+                            {% for item in doc_cluster_mapping %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                                        {{ item.document }} → Кластер {{ item.cluster }}
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#documentsAccordion">
+                                    <div class="accordion-body">
+                                        <p><strong>Содержимое файла (первые 500 символов):</strong></p>
+                                        <p>{{ item.text[:500] }}{% if item.text|length > 500 %}...{% endif %}</p>
+                                        <p><strong>Обработанный текст:</strong></p>
+                                        <p>{{ processed_docs[loop.index0][:500] }}{% if processed_docs[loop.index0]|length > 500 %}...{% endif %}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Функция добавления нового поля
+        document.getElementById('add-document').addEventListener('click', function() {
+            const container = document.getElementById('documents-container');
+            const newInput = document.createElement('div');
+            newInput.className = 'document-input';
+            newInput.innerHTML = `
+                <button type="button" class="btn btn-danger remove-doc-btn" onclick="removeDocument(this)">×</button>
+                <input type="file" class="form-control" name="documents[]" accept=".txt,.doc,.docx">
+            `;
+            container.appendChild(newInput);
+        });
+
+        // Функция удаления поля
+        function removeDocument(btn) {
+            const container = document.getElementById('documents-container');
+            if (container.children.length > 1) {
+                btn.parentElement.remove();
+            } else {
+                alert('Должен остаться хотя бы один файл');
+            }
+        }
+
+        // Функция сброса формы
+        document.getElementById('reset-form').addEventListener('click', function() {
+            const container = document.getElementById('documents-container');
+            // Оставляем только одно поле
+            while (container.children.length > 1) {
+                container.removeChild(container.lastChild);
+            }
+            // Очищаем оставшееся поле
+            container.querySelector('input[type="file"]').value = '';
+        });
+    </script>
+</body>
+</html>
